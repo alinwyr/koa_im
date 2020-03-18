@@ -1,0 +1,186 @@
+
+<div style="display: flex;">
+  <div style="border: 1px solid #dedede;width: 150px;height: 600px;position: relative;margin-right:20px;">
+    <div style="border-bottom: 1px solid #dedede;text-align: center;">所有用户</div>
+    <div style="text-align: center;padding:3px;font-size:12px;color:coral;margin-bottom:10px;">点击可聊天</div>
+    <ul id="users" style="overflow: auto;height: 510px;margin:0;padding:0;border-top:solid 1px #dedede;"></ul>
+  </div>
+
+  <div style="border: 1px solid #dedede;width: 180px;height: 600px;position: relative;">
+    <div style="border-bottom: 1px solid #dedede;text-align: center;">好友</div>
+    <div id="noFriend" style="border-bottom: 1px solid #dedede;text-align: center;font-size:12px;color:#898989;display: none;">！没朋友！</div>
+    <ul id="fList" style="overflow: auto;height: 510px;margin:0;padding:0;"></ul>
+    <div style="padding:10px;position: absolute;bottom: 0;border-top: 1px solid #dedede;width:160px;text-align: center;cursor: pointer;font-size:12px;color:coral;" onclick="moreFriend()">更多</div>
+  </div>
+  <div style="border: 1px solid #dedede;width: 300px;height: 600px;position: relative;">
+    <div style="border-bottom: 1px solid #dedede;text-align: center;">对方<span id="current"> </span></div>
+    <div style="border-bottom: 1px solid #dedede;text-align: center;cursor: pointer;padding:3px;font-size:12px;color:coral;" onclick="messages()">查看更多</div>
+    <div id="noMsg" style="display: none;text-align: center;padding:3px;font-size:12px;color:#898989;">消息加载完毕～～</div>
+    <ul id="list" style="overflow: auto;height: 485px;margin:0;padding:0;"></ul>
+    <div style="padding:10px;position: absolute;bottom: 0;border-top: 1px solid #dedede;width:280px;display:flex;justify-content: space-between;">
+      <input id="ipt">
+      <button id="sendBtn" style="cursor: pointer;" onclick="send()">发送</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.staticfile.org/socket.io/2.3.0/socket.io.js"></script>
+<script src="https://cdn.staticfile.org/jquery/3.4.1/jquery.js"></script>
+<script>
+  listStartTime = new Date() // 聊天列表最上面一条消息的时间
+  FriendlistStartTime = new Date() // 好友列表最下面一条好友的消息更新时间
+
+  to_user = null
+  // $('#head').text('用户：' + to_user)
+  const soc = io('http://localhost:'+port, {
+    path: '/chat',
+    reconnectionAttempts: 5, // 放弃之前尝试重新连接的次数
+    query: {
+      token,
+    }
+  })
+  soc.on('connect', res => {
+    $('body').prepend('<div>连接成功! 用户id:' + id + '</div><br>')
+    // 获取好友列表
+    moreFriend()
+    // 获取所有用户
+    allUser()
+  })
+
+
+  soc.on('error', err => {
+    try{
+      if(typeof err === 'string') {
+        err = JSON.parse(err)
+      }
+      if(err.code == 401){
+        return alert('登录信息已过期，请重新登录')
+      }else{
+        console.log(err)
+        $('body').append(err.message || '网络错误，请稍后重试')
+      }
+    }catch(e){
+      console.log(err)
+    }
+  })
+
+  soc.on('send', async ({code, data}) => {
+    $('#list').append('<li id="'+data._id+'">【'+ data.from + '】' + data.data + '</li>')
+    // $('#list').append('<li>' + data.data + '(' + data.from + ')</li>')
+    soc.emit('read', data._id)
+  })
+
+  // 撤回消息
+  soc.on('recall', async({code, data}) => {
+    if(code != 0)return
+    $('#' + data._id).html('<div style="color:#898989;font-size:10px;text-align:center;">撤回了一条消息</div>')
+  })
+
+  $(document).keypress(function (e){
+　　  if(e.keyCode == 13){
+　　　　 send()
+　　　}
+  })
+
+  function send(){
+    let msg = $('#ipt').val()
+    if(!msg)return
+    soc.emit('send', to_user, msg, function({code, data}){
+      if(code == 0){
+        $('#list').append('<li id="'+data._id+'" style="text-align: right;list-style: circle;">' + data.data + '(我)<button onclick="recall(\''+data._id+'\', this)">撤</button></li>')
+        $('#ipt').val('')
+        $('#ipt').focus()
+        $('#list').scrollTop($('#list').height());
+      }else if(res.code == 500){
+        alert(res.message || '发送失败')
+      }
+    })
+  }
+
+  function messages(userId){
+    if(userId){
+      if(to_user == userId) return
+      $('#user_' + to_user).css({color: 'black'})
+      to_user = userId
+      $('#user_' + userId).css({color: 'red'})
+      $('#current').text(userId)
+
+      listStartTime = new Date()
+      $('#list').html('')
+      $('#noMsg').hide()
+    }
+    soc.emit('list', to_user, listStartTime, ({code, message, data}) =>{
+      if(code !== 0){
+        return alert(message || '获取列表失败')
+      }else{
+        if(! data.length)return $('#noMsg').show()
+        data.forEach(v => {
+          if(v.from == id){
+            $('#list').prepend('<li id="'+v._id+'" style="text-align: right;list-style: circle;">' + v.data + '(我)<button onclick="recall(\''+v._id+'\', this)">撤</button></li>')
+
+          }else{
+            $('#list').prepend('<li id="'+v._id+'">【'+ v.from + '】' + v.data + '</li>')
+          }
+        });
+        listStartTime = data[data.length-1].createdAt
+      }
+    })
+  }
+
+  function moreFriend () {
+    soc.emit('friend', FriendlistStartTime, ({code, message, data}) =>{
+      if(code !== 0){
+        return alert(message || '获取列表失败')
+      }else{
+        if(! data.length)return $('#noFriend').show()
+        data.forEach(v => {
+            $('#fList').append('<li id="user_'+v.friend+'" style="text-align: center;">' +
+                '<span onclick="messages('+v.friend+')">' + v.friend + '(未读:'+v.unread+') </span>' +
+                '<button onclick="remove(' + v.friend + ', this)">删除</button>' +
+              '</li>')
+        });
+        FriendlistStartTime = data[data.length-1].createdAt
+      }
+    })
+  }
+
+  function setNew (id) {
+    // to_user = id
+    $('#current').text(id)
+    messages(id)
+  }
+
+  function allUser () {
+    soc.emit('users', ({code, message, data}) =>{
+      if(code !== 0){
+        return alert(message || '获取列表失败')
+      }else{
+        if(! data.length)return
+        data.forEach(v => {
+            $('#users').append('<li style="text-align: center;border-bottom:1px solid #dedede;padding:3px;cursor:pointer;" onclick="setNew('+v.id+')">' + v.name + '</li>')
+        });
+        FriendlistStartTime = data[data.length-1].createdAt
+      }
+    })
+  }
+
+  function remove(id, el) {
+    soc.emit('delete', id, ({code, message}) =>{
+      if(code !== 0){
+        return alert(message || '删除好友失败')
+      }else{
+        $(el).parent().remove()
+      }
+    })
+  }
+
+  function recall(id, el) {
+    soc.emit('recall', id, ({code, message}) =>{
+      if(code !== 0){
+        return alert(message || '撤回消息失败')
+      }else{
+        $(el).parent().html('<div style="color:#898989;font-size:10px;text-align:center;">撤回了一条消息</div>')
+      }
+    })
+  }
+</script>

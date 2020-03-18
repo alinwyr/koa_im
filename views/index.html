@@ -1,0 +1,43 @@
+<script src="https://cdn.staticfile.org/socket.io/2.3.0/socket.io.js"></script>
+<script src="https://cdn.staticfile.org/jquery/3.4.1/jquery.js"></script>
+<script>
+  let count = 1
+  const soc = io('http://localhost:'+port, {
+    path: '/chat',
+    reconnectionAttempts: 5,
+    query: {
+      token,
+    }
+  })
+  soc.on('connect', msg => {
+    $('body').append('<div>连接成功! 用户id:' + id + '</div><br>')
+    send()
+  })
+
+  soc.on('system', data => {
+    $('body').append('<div>【系统】： ' + data.message + '  ['+ (new Date().toJSON().split('.')[0].replace('T', ' ')) + '] </div><br>')
+    if(count < 5)setTimeout(send, 6000)
+  })
+
+  soc.on('error', err => {
+    try{
+      if(typeof err === 'string') {
+        err = JSON.parse(err)
+      }
+      if(err.code == 401){
+        return alert('登录信息已过期，请重新登录')
+      }else{
+        console.log(err)
+        $('body').append(err.message || '网络错误，请稍后重试')
+      }
+    }catch(e){
+      console.log(err)
+    }
+  })
+ 
+  function send(){
+    soc.emit('system', {count})
+    $('body').append('<div>【我】： 发送第 ' + count + ' 条信息。  [' + (new Date().toJSON().split('.')[0].replace('T', ' ')) + ']  </div><br>')
+    count++
+  }
+</script>
