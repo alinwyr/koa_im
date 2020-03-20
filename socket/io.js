@@ -30,7 +30,7 @@ module.exports = server => {
   });
 
   // 中间件
-  io.use(require('./middlewares/auth'));
+  // io.use(require('./middlewares/auth'));
 
   // 客户端连接事件，我的建议是连接的时候不要事情，具体在on监听里面写逻辑就好
   io.on('connection', async socket => {
@@ -78,7 +78,10 @@ module.exports = server => {
     if(process.env.NODE_ENV == 'development'){
 
       // 获取所有用户
-      socket.on('users', userHandler(socket, io));
+      socket.on('users', userHandler.all(socket, io));
+
+      // 删除用户
+      socket.on('del_user',userHandler.removeUser(socket, io))
 
       // 系统消息
       socket.on('system', sysHandler(socket, io))

@@ -29,9 +29,7 @@
 <script>
   listStartTime = new Date() // 聊天列表最上面一条消息的时间
   FriendlistStartTime = new Date() // 好友列表最下面一条好友的消息更新时间
-
   to_user = null
-  // $('#head').text('用户：' + to_user)
   const soc = io('http://localhost:'+port, {
     path: '/chat',
     reconnectionAttempts: 5, // 放弃之前尝试重新连接的次数
@@ -39,6 +37,7 @@
       token,
     }
   })
+
   soc.on('connect', res => {
     $('body').prepend('<div>连接成功! 用户id:' + id + '</div><br>')
     // 获取好友列表
@@ -148,6 +147,12 @@
     // to_user = id
     $('#current').text(id)
     messages(id)
+  }
+
+  function removeUser (_id) {
+    soc.emit('del_user', _id,({code, message, data}) =>{
+
+    })
   }
 
   function allUser () {

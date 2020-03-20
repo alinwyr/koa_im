@@ -7,6 +7,7 @@ const json = require('koa-json')
 const koaBody = require('koa-body')
 const onerror = require('koa-onerror')
 const logger = require('koa-logger')
+const cors = require('koa2-cors');
 const index = require('./routes/index')
 
 // error handler
@@ -21,6 +22,7 @@ app.use(koaBody({
     keepExtensions: true,
   },
 }));
+
 app.use(json())
 app.use(logger())
 // app.use(require('koa-static')(__dirname + '/public'))
@@ -54,11 +56,6 @@ app.use(async (ctx, next) => {
 // routes
 app.use(index.routes(), index.allowedMethods())
 
-// error-handling
-app.on('error', (err, ctx) => {
-  console.error('server error', err, ctx)
-});
-
-
+app.user(cors())
 
 module.exports = app

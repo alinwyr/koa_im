@@ -29,5 +29,8 @@ module.exports = {
 
   async insertTestData (data) {
     await user.insertMany(data)
+  },
+  async removeUser(_id){
+    await user.remove({_id})
   }
 }
